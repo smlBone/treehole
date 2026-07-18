@@ -6,7 +6,6 @@ import org.mf.treehole.dto.SendMessageRequest;
 import org.mf.treehole.dto.SystemMessageRequest;
 import org.mf.treehole.entity.Message;
 import org.mf.treehole.entity.SystemMessage;
-import org.mf.treehole.entity.User;
 import org.mf.treehole.mapper.RowMappers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -69,18 +68,18 @@ public class MessageService {
 
         List<Map<String, Object>> conversations = jdbc.query("""
                 SELECT
-                    CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS other_user_id,
+                    IF(m.sender_id = ?, m.receiver_id, m.sender_id) AS other_user_id,
                     u.nickname AS other_nickname,
                     u.avatar AS other_avatar,
                     u.role AS other_role,
                     MAX(m.created_at) AS last_message_time,
-                    (SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AND is_read = 0) AS unread_count
+                    (SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND sender_id = IF(m.sender_id = ?, m.receiver_id, m.sender_id) AND is_read = 0) AS unread_count
                 FROM messages m
-                INNER JOIN users u ON u.id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
+                INNER JOIN users u ON u.id = IF(m.sender_id = ?, m.receiver_id, m.sender_id)
                 WHERE m.sender_id = ? OR m.receiver_id = ?
                 GROUP BY other_user_id, u.nickname, u.avatar, u.role
                 ORDER BY last_message_time DESC
-                """, (rs, rowNum) -> {
+                """, (rs, _) -> {
                     Map<String, Object> conv = new java.util.HashMap<>();
                     conv.put("userId", rs.getLong("other_user_id"));
                     conv.put("nickname", rs.getString("other_nickname"));
@@ -108,7 +107,7 @@ public class MessageService {
                 INNER JOIN users su ON m.sender_id = su.id
                 INNER JOIN users ru ON m.receiver_id = ru.id
                 WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
-                ORDER BY m.created_at ASC
+                ORDER BY m.created_at
                 """, (rs, rowNum) -> {
             Message m = RowMappers.MESSAGE.mapRow(rs, rowNum);
             m.setSenderNickname(rs.getString("sender_nickname"));

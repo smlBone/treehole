@@ -1,6 +1,7 @@
 package org.mf.treehole.service;
 
 import jakarta.annotation.Resource;
+import jakarta.mail.internet.MimeMessage;
 import org.mf.treehole.common.Constants;
 import org.mf.treehole.common.Result;
 import org.mf.treehole.dto.*;
@@ -9,11 +10,12 @@ import org.mf.treehole.mapper.RowMappers;
 import org.mf.treehole.util.JwtUtil;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
 
 @Service
@@ -30,6 +32,8 @@ public class AuthService {
 
     @Resource
     private JwtUtil jwtUtil;
+
+    private static final Random random = new Random();
 
     private static final String FROM_EMAIL = "3184465467@qq.com";
 
@@ -55,17 +59,44 @@ public class AuthService {
             return Result.error(429, "验证码发送过于频繁，请稍后再试");
         }
 
-        String code = String.format("%06d", new Random().nextInt(1000000));
+        String code = String.format("%06d", random.nextInt(1000000));
         String codeKey = Constants.REDIS_VERIFY_CODE + email;
         redis.opsForValue().set(codeKey, code, Duration.ofMinutes(5));
         redis.opsForValue().set(rateLimitKey, "1", Duration.ofSeconds(60));
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(FROM_EMAIL);
-        message.setTo(email);
-        message.setSubject("RESET".equals(purpose) ? "校园树洞 - 重置密码验证码" : "校园树洞 - 注册验证码");
-        message.setText("您的验证码是：" + code + "，有效期5分钟。如非本人操作，请忽略此邮件。");
-        mailSender.send(message);
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(FROM_EMAIL);
+
+            helper.setTo(email);
+            helper.setSubject("【校园树洞】验证码");
+
+            helper.setText("""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <h2 style="color: #333; text-align: center;">验证码</h2>
+                    <p style="font-size: 16px; color: #555;">您的验证码是：</p>
+                    <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; color: rgb(44, 219, 56); letter-spacing: 4px; border-radius: 5px;">
+                        %s
+                    </div>
+                    <p style="font-size: 14px; color: #555; margin-top: 20px;">有效期5分钟，请勿泄露给他人。如非本人操作，请忽略此邮件。</p>
+                    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #aaa;">此邮件由系统自动发送，请勿回复</p>
+                </div>
+                """.formatted(code), true);
+
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            return Result.error(500, "邮件发送失败");
+        }
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setFrom(FROM_EMAIL);
+//        message.setTo(email);
+//        message.setSubject("RESET".equals(purpose) ? "校园树洞 - 重置密码验证码" : "校园树洞 - 注册验证码");
+//        message.setText("您的验证码是：" + code + "，有效期5分钟。如非本人操作，请忽略此邮件。");
+//        mailSender.send(message);
 
         return Result.success();
     }
@@ -135,12 +166,12 @@ public class AuthService {
     }
 
     public User findByEmail(String email) {
-        var list = jdbc.query("SELECT * FROM users WHERE email = ?", RowMappers.USER, email);
-        return list.isEmpty() ? null : list.get(0);
+        List<User> list = jdbc.query("SELECT * FROM users WHERE email = ?", RowMappers.USER, email);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     public User findById(Long id) {
-        var list = jdbc.query("SELECT * FROM users WHERE id = ?", RowMappers.USER, id);
-        return list.isEmpty() ? null : list.get(0);
+        List<User> list = jdbc.query("SELECT * FROM users WHERE id = ?", RowMappers.USER, id);
+        return list.isEmpty() ? null : list.getFirst();
     }
 }

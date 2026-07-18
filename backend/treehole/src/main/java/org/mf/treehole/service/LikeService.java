@@ -4,9 +4,6 @@ import jakarta.annotation.Resource;
 import org.mf.treehole.common.Constants;
 import org.mf.treehole.common.Result;
 import org.mf.treehole.common.UserContext;
-import org.mf.treehole.entity.Post;
-import org.mf.treehole.entity.Comment;
-import org.mf.treehole.mapper.RowMappers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -50,11 +47,9 @@ public class LikeService {
             liked = true;
 
             // 每10次被赞+1信誉分
-            if (liked) {
-                Long targetUserId = getTargetUserId(targetType, targetId);
-                if (targetUserId != null && !targetUserId.equals(userId)) {
-                    checkAndAddCreditForLikes(targetUserId);
-                }
+            Long targetUserId = getTargetUserId(targetType, targetId);
+            if (targetUserId != null && !targetUserId.equals(userId)) {
+                checkAndAddCreditForLikes(targetUserId);
             }
         }
 
@@ -66,17 +61,17 @@ public class LikeService {
         if (Constants.TARGET_POST.equals(targetType)) {
             jdbc.update("UPDATE posts SET like_count = like_count + ? WHERE id = ?", delta, targetId);
         } else if (Constants.TARGET_COMMENT.equals(targetType)) {
-            // 评论没有单独的like_count字段, 可通过查询likes表获取
+            // TODO: 评论没有单独的like_count字段, 可通过查询likes表获取
         }
     }
 
     private Long getTargetUserId(String targetType, Long targetId) {
         if (Constants.TARGET_POST.equals(targetType)) {
-            var list = jdbc.query("SELECT user_id FROM posts WHERE id = ?", (rs, rowNum) -> rs.getLong("user_id"), targetId);
-            return list.isEmpty() ? null : list.get(0);
+            var list = jdbc.query("SELECT user_id FROM posts WHERE id = ?", (rs, _) -> rs.getLong("user_id"), targetId);
+            return list.isEmpty() ? null : list.getFirst();
         } else if (Constants.TARGET_COMMENT.equals(targetType)) {
-            var list = jdbc.query("SELECT user_id FROM comments WHERE id = ?", (rs, rowNum) -> rs.getLong("user_id"), targetId);
-            return list.isEmpty() ? null : list.get(0);
+            var list = jdbc.query("SELECT user_id FROM comments WHERE id = ?", (rs, _) -> rs.getLong("user_id"), targetId);
+            return list.isEmpty() ? null : list.getFirst();
         }
         return null;
     }

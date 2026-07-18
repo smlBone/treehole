@@ -11,9 +11,7 @@ import org.mf.treehole.mapper.RowMappers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class UserService {
@@ -28,7 +26,7 @@ public class UserService {
             return Result.error(404, "用户不存在");
         }
         user.setPassword(null);
-        enrichUserStats(user, userId);
+        enrichUserStats(user);
         return Result.success(user);
     }
 
@@ -53,7 +51,7 @@ public class UserService {
         user.setIsBlocked(isBlocked(currentUserId, targetId));
 
         if (!isSpecial || targetId.equals(currentUserId) || UserContext.isAdmin()) {
-            enrichUserStats(user, currentUserId);
+            enrichUserStats(user);
         }
 
         return Result.success(user);
@@ -62,7 +60,7 @@ public class UserService {
     public Result<User> updateProfile(UpdateProfileRequest req) {
         Long userId = UserContext.getUserId();
         StringBuilder sql = new StringBuilder("UPDATE users SET ");
-        var params = new java.util.ArrayList<Object>();
+        var params = new java.util.ArrayList<>();
         if (req.getNickname() != null) {
             sql.append("nickname = ?, ");
             params.add(req.getNickname());
@@ -100,6 +98,9 @@ public class UserService {
 
     public Result<Void> follow(Long targetId) {
         Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return Result.error(500, "用户ID为空");
+        }
         if (userId.equals(targetId)) {
             return Result.error(400, "不能关注自己");
         }
@@ -119,6 +120,9 @@ public class UserService {
 
     public Result<Void> block(Long targetId) {
         Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return Result.error(500, "用户ID为空");
+        }
         if (userId.equals(targetId)) {
             return Result.error(400, "不能拉黑自己");
         }
@@ -169,10 +173,10 @@ public class UserService {
 
     public User findById(Long id) {
         var list = jdbc.query("SELECT * FROM users WHERE id = ?", RowMappers.USER, id);
-        return list.isEmpty() ? null : list.get(0);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
-    private void enrichUserStats(User user, Long currentUserId) {
+    private void enrichUserStats(User user) {
         Integer postCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM posts WHERE user_id = ? AND status = 'PUBLISHED'",
                 Integer.class, user.getId());

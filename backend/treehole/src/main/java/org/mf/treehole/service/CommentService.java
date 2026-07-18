@@ -87,7 +87,7 @@ public class CommentService {
                 FROM comments c
                 INNER JOIN users u ON c.user_id = u.id
                 WHERE c.post_id = ? AND c.status = 'PUBLISHED'
-                ORDER BY c.created_at ASC
+                ORDER BY c.created_at
                 """, (rs, rowNum) -> {
             Comment c = RowMappers.COMMENT.mapRow(rs, rowNum);
             c.setAuthorNickname(rs.getString("author_nickname"));
@@ -157,7 +157,7 @@ public class CommentService {
 
     private Comment findCommentById(Long id) {
         var list = jdbc.query("SELECT * FROM comments WHERE id = ?", RowMappers.COMMENT, id);
-        return list.isEmpty() ? null : list.get(0);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     private boolean hasLiked(Long userId, String targetType, Long targetId) {

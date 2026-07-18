@@ -4,13 +4,13 @@ import jakarta.annotation.Resource;
 import org.mf.treehole.common.*;
 import org.mf.treehole.dto.CreatePostRequest;
 import org.mf.treehole.entity.Post;
+import org.mf.treehole.entity.User;
 import org.mf.treehole.mapper.RowMappers;
 import org.mf.treehole.util.DeepSeekChat;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class PostService {
@@ -88,7 +88,7 @@ public class PostService {
                 INNER JOIN users u ON p.user_id = u.id
                 WHERE p.status = 'PUBLISHED' AND p.board = ?
                 """);
-        var params = new java.util.ArrayList<Object>();
+        var params = new java.util.ArrayList<>();
         params.add(board);
 
         // 世界树洞：过滤掉被拉黑用户的帖子
@@ -158,7 +158,7 @@ public class PostService {
 
         // 秘密树洞：隐藏作者信息（但保留小树灵的回复）
         if (Constants.BOARD_SECRET.equals(post.getBoard())) {
-            if (!Constants.ROLE_SPECIAL.equals(user.getRole())) {
+            if (user != null && !Constants.ROLE_SPECIAL.equals(user.getRole())) {
                 post.setUserId(null);
                 post.setAuthorNickname("匿名用户");
                 post.setAuthorAvatar(null);
@@ -255,7 +255,7 @@ public class PostService {
                 FROM posts p
                 INNER JOIN users u ON p.user_id = u.id
                 WHERE p.status = 'PENDING'
-                ORDER BY p.created_at ASC
+                ORDER BY p.created_at
                 LIMIT ? OFFSET ?
                 """, (rs, rowNum) -> {
             Post p = RowMappers.POST.mapRow(rs, rowNum);
@@ -279,9 +279,9 @@ public class PostService {
         return Result.success();
     }
 
-    private Post findById(Long postId) {
+    public Post findById(Long postId) {
         var list = jdbc.query("SELECT * FROM posts WHERE id = ?", RowMappers.POST, postId);
-        return list.isEmpty() ? null : list.get(0);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     private boolean hasLiked(Long userId, String targetType, Long targetId) {

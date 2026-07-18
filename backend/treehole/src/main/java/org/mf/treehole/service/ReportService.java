@@ -103,7 +103,7 @@ public class ReportService {
                 LEFT JOIN users u ON r.reporter_id = u.id
                 LEFT JOIN users h ON r.handler_id = h.id
                 WHERE r.status = 'PENDING'
-                ORDER BY r.created_at ASC
+                ORDER BY r.created_at
                 LIMIT ? OFFSET ?
                 """, (rs, rowNum) -> {
             Report r = RowMappers.REPORT.mapRow(rs, rowNum);
@@ -179,22 +179,23 @@ public class ReportService {
 
     private Report findReportById(Long id) {
         var list = jdbc.query("SELECT * FROM reports WHERE id = ?", RowMappers.REPORT, id);
-        return list.isEmpty() ? null : list.get(0);
+        if (list.isEmpty()) return null;
+        return list.getFirst();
     }
 
     private Long getTargetOwnerId(String targetType, Long targetId) {
         String table = Constants.TARGET_POST.equals(targetType) ? "posts" : "comments";
         var list = jdbc.query("SELECT user_id FROM " + table + " WHERE id = ?",
-                (rs, rowNum) -> rs.getLong("user_id"), targetId);
-        return list.isEmpty() ? null : list.get(0);
+                (rs, _) -> rs.getLong("user_id"), targetId);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     private String getTargetContent(String targetType, Long targetId) {
         String table = Constants.TARGET_POST.equals(targetType) ? "posts" : "comments";
         var list = jdbc.query("SELECT content FROM " + table + " WHERE id = ?",
-                (rs, rowNum) -> rs.getString("content"), targetId);
+                (rs, _) -> rs.getString("content"), targetId);
         if (list.isEmpty()) return "[内容已删除]";
-        String content = list.get(0);
+        String content = list.getFirst();
         return content.length() > 100 ? content.substring(0, 100) + "..." : content;
     }
 
